@@ -117,8 +117,8 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {});
 });
 
+// Endpoint to keep server alive and serve basic info
 app.get("/", (_req, res) => res.send("SoundComm Socket server running"));
-const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => console.log(`Socket server on http://localhost:${PORT}`));
 
+// Export the server for Vercel to use
 module.exports.handler = serverless(server);
