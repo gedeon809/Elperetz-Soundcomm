@@ -1,15 +1,17 @@
-// index.js
+// backend/server.js
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
+const serverless = require("serverless-http");
 
 const app = express();
 app.use(cors({ origin: "*" }));
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*" }, transports: ["websocket"]
+  cors: { origin: "*" },
+  transports: ["websocket"],
 });
 
 const INITIAL_LEVEL = 5;
@@ -50,7 +52,6 @@ io.on("connection", (socket) => {
       socket.join(currentRoom);
       const st = ensureRoom(currentRoom);
       socket.emit("state:levels", st.levels);
-      // (Optional) join message:
       io.to(currentRoom).emit("log:append", { id: mkId(), at: nowTime(), from: "B", text: `Joined room ${currentRoom}`, senderId: socket.id });
     } catch {}
   });
@@ -119,3 +120,5 @@ io.on("connection", (socket) => {
 app.get("/", (_req, res) => res.send("SoundComm Socket server running"));
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => console.log(`Socket server on http://localhost:${PORT}`));
+
+module.exports.handler = serverless(server);
