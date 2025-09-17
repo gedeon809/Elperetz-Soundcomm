@@ -1,17 +1,23 @@
-// index.js
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
 
 const app = express();
+
+// Enable CORS for all origins (adjust as needed for tighter security)
 app.use(cors({ origin: "*" }));
 
+// Create HTTP server
 const server = http.createServer(app);
+
+// Initialize Socket.IO server with WebSocket and Polling transports
 const io = new Server(server, {
-  cors: { origin: "*" }, transports: ["websocket"]
+  cors: { origin: "*" }, // Allow all origins (adjust as needed)
+  transports: ["websocket", "polling"], // Allow both WebSocket and Polling (fallback to Polling)
 });
 
+// Constants and Instrument Configuration
 const INITIAL_LEVEL = 5;
 const INSTRUMENTS = [
   { key: "keyboard", label: "Keyboard" },
@@ -38,10 +44,12 @@ function ensureRoom(room) {
   return rooms.get(room);
 }
 
+// Handle WebSocket connections
 io.on("connection", (socket) => {
   let currentRoom = null;
   let role = "A";
 
+  // Join Room
   socket.on("join-room", ({ room, role: r }) => {
     try {
       if (currentRoom) socket.leave(currentRoom);
@@ -50,16 +58,21 @@ io.on("connection", (socket) => {
       socket.join(currentRoom);
       const st = ensureRoom(currentRoom);
       socket.emit("state:levels", st.levels);
-      // (Optional) join message:
+
+      // Optional join message
       io.to(currentRoom).emit("log:append", { id: mkId(), at: nowTime(), from: "B", text: `Joined room ${currentRoom}`, senderId: socket.id });
-    } catch {}
+    } catch (error) {
+      console.error("Error joining room:", error);
+    }
   });
 
+  // Request Levels
   socket.on("state:requestLevels", ({ room }) => {
     const st = ensureRoom(room || currentRoom || "main");
     socket.emit("state:levels", st.levels);
   });
 
+  // Handle 'a:request' events
   socket.on("a:request", ({ room, instrumentKey, action, text }) => {
     const r = String(room || currentRoom || "main");
     const payload = {
@@ -72,6 +85,7 @@ io.on("connection", (socket) => {
     io.to(r).emit("log:append", payload);
   });
 
+  // Handle 'b:adjust' events
   socket.on("b:adjust", ({ room, instrumentKey, delta, text }) => {
     const r = String(room || currentRoom || "main");
     const st = ensureRoom(r);
@@ -92,6 +106,7 @@ io.on("connection", (socket) => {
     });
   });
 
+  // Handle 'b:ack' events
   socket.on("b:ack", ({ room, instrumentKey, text }) => {
     const r = String(room || currentRoom || "main");
     const label = LABEL[instrumentKey] || null;
@@ -104,6 +119,7 @@ io.on("connection", (socket) => {
     });
   });
 
+  // Reset levels in room
   socket.on("reset-levels", ({ room }) => {
     const r = String(room || currentRoom || "main");
     const st = ensureRoom(r);
@@ -113,9 +129,15 @@ io.on("connection", (socket) => {
     io.to(r).emit("log:append", { id: mkId(), at: nowTime(), from: "B", text: "Levels reset", senderId: socket.id });
   });
 
-  socket.on("disconnect", () => {});
+  // Disconnect
+  socket.on("disconnect", () => {
+    console.log(`User disconnected: ${socket.id}`);
+  });
 });
 
+// Simple GET route to confirm server is up
 app.get("/", (_req, res) => res.send("SoundComm Socket server running"));
+
+// Set the port from environment variables (Railway will provide this) or fallback to 4000
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => console.log(`Socket server on http://localhost:${PORT}`));
