@@ -1,0 +1,10 @@
+
+{
+  "functions": {
+    "server.js": {
+      "runtime": "nodejs16.x",
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  }
+}
